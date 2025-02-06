@@ -38,14 +38,14 @@ default_simulator = gws(str(config_path))
 GIT_DESCRIPTION = get_git_describe()
 
 
-def run_sim(theta: torch.Tensor, simulator: gws = default_simulator):
+def run_sim(theta: torch.Tensor, simulator: gws = default_simulator) -> torch.Tensor:
     """
     perform one simulation given simulator object and the simulator parameters theta
 
     Parameters
     ----------
     theta : torch.Tensor
-        simulator parameters
+        simulator parameters, provided in unbatched format
 
     simulator : GravitationalWaveBenchmarkSimulator
         simulator object
@@ -54,11 +54,19 @@ def run_sim(theta: torch.Tensor, simulator: gws = default_simulator):
     --------
     > theta
     torch.Tensor([5,10])
-    > run_sim(theta)
+    > x = run_sim(theta)
     # ...
+    > x.shape
+    [1,2,8192]
 
+    Returns
+    -------
+    LIGO spectra in batched format
     """
-    masses = torch.Tensor([theta[0], theta[1] * theta[0]])
+
+    masses = torch.zeros_like(theta)
+    masses[...,0] = theta[...,0]
+    masses[...,1] = theta[...,1] * theta[...,0]
     xs = simulator(masses.to("cpu"))
     return masses, xs
 
