@@ -15,6 +15,7 @@ dependencies = [
 "loguru", #CLI goodness
 "click" #CLI helper
 ]
+include-package-data = true
 
 [project.optional-dependencies]
 dev = ["pytest"]
@@ -23,7 +24,7 @@ dev = ["pytest"]
 gw-simulator = "gw_simulator:main"
 
 [tool.setuptools.package-data]
-include = ["config/pycbc_config.ini"]
+include = ["src/gw_simulator/config/pycbc_config.ini"]
 
 [build-system]
 requires = ["hatchling"]
