@@ -26,7 +26,7 @@ else:
 
 ROOTFOLDER = Path(__file__).resolve().parent
 
-config_path = ROOTFOLDER / "config/config_file.ini"
+config_path = ROOTFOLDER / "config/pycbc_config.ini"
 
 print(f"using config file {config_path} for GWS simulator")
 
@@ -40,7 +40,8 @@ GIT_DESCRIPTION = get_git_describe()
 
 def run_sim(theta: torch.Tensor, simulator: gws = default_simulator) -> torch.Tensor:
     """
-    perform one simulation given simulator object and the simulator parameters theta
+    Perform one simulation given simulator object and the simulator parameters
+    theta.
 
     Parameters
     ----------
@@ -71,42 +72,38 @@ def run_sim(theta: torch.Tensor, simulator: gws = default_simulator) -> torch.Te
     return masses, xs
 
 
-@click.command()
-@click.option('-I', '--batch-id', default=1, type=int, help='batch index.')
-@click.option('-n', '--num_sims', default=NUM_SIMS, type=int, help='number of simulations to perform')
-@click.option('-j', '--num_workers', default=1, type=int, help='number of worker processes to use in parallel')
-@click.option('-s', '--simulator_config_file', default=config_path, type=click.Path(), help='path to simulator config file')
-def main(batch_id, num_sims, num_workers, simulator_config_file):
-    """ will generate {NUM_SIMS} samples from simulator and store the output in gws-<BATCH-INDEX>.h5 """
+def sim_and_store(thetas: torch.Tensor, batch_id: int, seed_in_use: int, num_sims: int, num_workers: int, output: Path, simulator_config_file: Path):
+    """
+    perform simulations and store output in hdf5 file. This function uses
+    multiprocessing internally to facilitate parallel execution.
 
-    idx = int(batch_id)  # Read in the first argument
+    Parameters
+    ----------
+    thetas : torch.Tensor
+        simulation parameters to simulate, these are expected to be batched and
+        have shape [num_sims, 2]
+    batch_id : int
+        unique ID for this batch of simulations in a simulation campaign
+    seed_in_use : int
+        seed that was used for this session (will not be reset in this function)
+    num_sims : int
+        number of simulations to perform
+    num_workers : int
+        number of parallel workers to use
+    output : Path
+        path of output file
+    simulator_config_file : Path
+        location of config file for simulator
 
-    #override with openmp settings
-    if "OMP_NUM_THREADS" in os.environ.keys():
-        openmp_ncores = int(os.environ["OMP_NUM_THREADS"])
-        click.echo(f"overriding nworkers {num_workers} -> {openmp_ncores}")
-        num_workers = openmp_ncores
+    Returns
+    -------
+    int : 0 if successful
 
-    #reproducibility
-    np.random.seed(idx)
-    torch.manual_seed(idx)
-
-    # generating mass1 and ratio r=m2/m1
-    # this way we ensure that mass2 is always less than mass1
-    # as mass2 = r*mass1
-    lower = torch.tensor([40.0, 0.25])
-    upper = torch.tensor([80.0, 0.99])
-
-    indep_uniform = torch.distributions.Uniform(lower, upper)
-    #sample from the prior
-    thetas = indep_uniform.sample((num_sims,)).view(-1, 2)
-
-    print(
-        f"simulating batch {idx} of {num_sims} simulated samples on {num_workers} detected cores"
-    )
+    """
     #preparing the simulator
     simulator_ = gws(str(simulator_config_file))
     run_sim_ = partial(run_sim, simulator=simulator_)
+    idx = batch_id
 
     #simulate gravitational waves
     start = time.time()
@@ -125,7 +122,7 @@ def main(batch_id, num_sims, num_workers, simulator_config_file):
     print("thetas:", thetas.shape, thetas.dtype)
     print("xs:", xs.shape, xs.dtype)
 
-    outfile = f"denovo-gws-{idx:02.0f}.h5"
+    outfile = output.replace("<batchindex>", f"{batch_id:02.0f}")
     with h5py.File(outfile, "w") as out5:
         out5_xs = out5.create_dataset(
             "xs",
@@ -148,10 +145,10 @@ def main(batch_id, num_sims, num_workers, simulator_config_file):
 
         out5_xs.attrs["config_file"] = config_content_str
         out5_xs.attrs["pycbc_version"] = pycbc.__version__
-        out5_xs.attrs["seed"] = idx
+        out5_xs.attrs["seed"] = seed_in_use
         out5_xs.attrs["git-describe"] = GIT_DESCRIPTION
-        out5_thetas.attrs["seed"] = idx
-        out5_masses.attrs["seed"] = idx
+        out5_thetas.attrs["seed"] = seed_in_use
+        out5_masses.attrs["seed"] = seed_in_use
 
     end2 = time.time()
     dur_io_sec = end2 - end1
@@ -159,6 +156,45 @@ def main(batch_id, num_sims, num_workers, simulator_config_file):
         f"{num_sims} simulated samples written to {outfile} in {dur_io_sec:.2f} s ({dur_io_sec/float(num_sims):02.4f} sample/s)"
     )
     return 0
+
+
+@click.command()
+@click.option('-I', '--batch-id', default=1, type=int, help='batch index.')
+@click.option('-n', '--num_sims', default=NUM_SIMS, type=int, help='number of simulations to perform')
+@click.option('-j', '--num_workers', default=1, type=int, help='number of worker processes to use in parallel')
+@click.option('-o', '--output', default="gws-<batchindex>.h5", type=click.Path(), help='output file location, please keep <batchindex> as placeholder')
+@click.option('-s', '--simulator_config_file', default=config_path, type=click.Path(), help='path to simulator config file')
+def main(batch_id, num_sims, num_workers, output, simulator_config_file):
+    """ will generate {NUM_SIMS} samples from simulator and store the output in a hdf5 file """
+
+    idx = int(batch_id)  # Read in the first argument
+
+    #override with openmp settings
+    if "OMP_NUM_THREADS" in os.environ.keys():
+        openmp_ncores = int(os.environ["OMP_NUM_THREADS"])
+        print(f"overriding nworkers {num_workers} -> {openmp_ncores}")
+        num_workers = openmp_ncores
+
+    #reproducibility
+    np.random.seed(idx)
+    torch.manual_seed(idx)
+
+    # generating mass1 and ratio r=m2/m1
+    # this way we ensure that mass2 is always less than mass1
+    # as mass2 = r*mass1
+    lower = torch.tensor([40.0, 0.25])
+    upper = torch.tensor([80.0, 0.99])
+
+    indep_uniform = torch.distributions.Uniform(lower, upper)
+    #sample from the prior
+    thetas = indep_uniform.sample((num_sims,)).view(-1, 2)
+
+    print(
+        f"simulating batch {idx} of {num_sims} simulated samples on {num_workers} detected cores"
+    )
+    value = sim_and_store(thetas, batch_id, batch_id, num_sims, num_workers, output, config_path)
+    return value
+
 
 # Run the simulator on multiple cores
 # Note: This is neither a well written, nor a flexible script.

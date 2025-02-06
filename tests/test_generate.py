@@ -12,7 +12,7 @@ def test_simple_sim():
 
     assert masses.shape == theta.shape
     assert xs.shape != theta.shape
-    assert list(xs.shape) == [1,2,8192]
+    assert list(xs.shape) == [1, 2, 8192]
 
 
 def test_batched_sim():
