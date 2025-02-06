@@ -22,6 +22,9 @@ dev = ["pytest"]
 [project.scripts]
 gw-simulator = "gw_simulator:main"
 
+[tool.setuptools.package-data]
+include = ["config/pycbc_config.ini"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
