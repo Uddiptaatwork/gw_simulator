@@ -9,12 +9,11 @@ import hdf5plugin
 import numpy as np
 import pycbc
 import torch
-from sbi import utils
 from torch import multiprocessing
 from pathlib import Path
 import click
-from simulator.interface import GravitationalWaveBenchmarkSimulator as gws
-from utils import get_git_describe
+from gw_simulator.simulator.interface import GravitationalWaveBenchmarkSimulator as gws
+from gw_simulator.utils import get_git_describe
 
 pycbc_semver = pycbc.__version__.split(".")
 
@@ -87,13 +86,12 @@ def main(batch_id, num_sims, num_workers, simulator_config_file):
     # generating mass1 and ratio r=m2/m1
     # this way we ensure that mass2 is always less than mass1
     # as mass2 = r*mass1
-    prior = utils.BoxUniform(
-        low=torch.tensor([40.0, 0.25]),
-        high=torch.tensor([80.0, 0.99]),
-    )
+    lower = torch.tensor([40.0, 0.25])
+    upper = torch.tensor([80.0, 0.99])
 
+    indep_uniform = torch.distributions.Uniform(lower, upper)
     #sample from the prior
-    thetas = prior.sample((num_sims,)).view(-1, 2)
+    thetas = indep_uniform.sample((num_sims,)).view(-1, 2)
 
     print(
         f"simulating batch {idx} of {num_sims} simulated samples on {num_workers} detected cores"
