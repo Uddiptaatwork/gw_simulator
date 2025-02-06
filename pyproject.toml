@@ -1,13 +1,22 @@
 [project]
 name = "gw-simulator"
 version = "0.1.0"
-description = "Add your description here"
+description = "simulator library and CLI app to produce LIGO data for a binary black hole event"
 readme = "README.md"
 authors = [
     { name = "Peter Steinbach", email = "p.steinbach@hzdr.de" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+"h5py", #io
+"hdf5plugin", #compression in hdf5
+"PyCBC @ git+https://github.com/gwastro/pycbc.git@master", #simulator framework
+"loguru", #CLI goodness
+"click" #CLI helper
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
 
 [project.scripts]
 gw-simulator = "gw_simulator:main"
