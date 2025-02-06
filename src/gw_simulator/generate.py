@@ -41,7 +41,7 @@ GIT_DESCRIPTION = get_git_describe()
 def run_sim(theta: torch.Tensor, simulator: gws = default_simulator) -> torch.Tensor:
     """
     Perform one simulation given simulator object and the simulator parameters
-    theta.
+    theta. The thetas are expected to be provide mass0 in dim (...,0) and a value between .25 and .99 in dim (..., 1). mass1 is then calculated by theta[...,1]*mass0. mass0 is copied from theta[...,0] directly.
 
     Parameters
     ----------
