@@ -11,6 +11,7 @@ dependencies = [
 "h5py", #io
 "hdf5plugin", #compression in hdf5
 "PyCBC>2.7", #simulator framework
+"torch", #simulator framework
 "loguru", #CLI goodness
 "click" #CLI helper
 ]
