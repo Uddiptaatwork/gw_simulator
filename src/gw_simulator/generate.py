@@ -3,16 +3,18 @@ import os
 import sys
 import time
 from functools import partial
+from pathlib import Path
 
+import click
 import h5py
 import hdf5plugin
 import numpy as np
 import pycbc
 import torch
 from torch import multiprocessing
-from pathlib import Path
-import click
-from gw_simulator.simulator.interface import GravitationalWaveBenchmarkSimulator as gws
+
+from gw_simulator.simulator.interface import \
+    GravitationalWaveBenchmarkSimulator as gws
 from gw_simulator.utils import get_git_describe
 
 pycbc_semver = pycbc.__version__.split(".")
@@ -41,12 +43,16 @@ GIT_DESCRIPTION = get_git_describe()
 def run_sim(theta: torch.Tensor, simulator: gws = default_simulator) -> torch.Tensor:
     """
     Perform one simulation given simulator object and the simulator parameters
-    theta. The thetas are expected to be provide mass0 in dim (...,0) and a value between .25 and .99 in dim (..., 1). mass1 is then calculated by theta[...,1]*mass0. mass0 is copied from theta[...,0] directly.
+    theta. The thetas encode the mass of the blackhole (index 0 in last dimension).
+    Entry at index 1 of theta's last dimension corresponds to the fraction of
+    mass 0 which results in the mass of black whole 1. In other words,
+    mass[...,0] = theta[...,0]
+    mass[...,1] = theta[...,0]*theta[...,1]
 
     Parameters
     ----------
     theta : torch.Tensor
-        simulator parameters, provided in unbatched format
+        simulator parameters, provided in batched format
 
     simulator : GravitationalWaveBenchmarkSimulator
         simulator object
@@ -54,11 +60,13 @@ def run_sim(theta: torch.Tensor, simulator: gws = default_simulator) -> torch.Te
     Examples
     --------
     > theta
-    torch.Tensor([5,10])
-    > x = run_sim(theta)
+    torch.Tensor([[20,0.5]])
+    > masses, x = run_sim(theta)
     # ...
     > x.shape
     [1,2,8192]
+    > masses
+    tensor([[20.0000,  10.0000]])
 
     Returns
     -------
