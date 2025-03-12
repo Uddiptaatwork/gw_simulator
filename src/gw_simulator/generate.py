@@ -36,8 +36,8 @@ with open(config_path, "r") as cfile:
     config_content_str = cfile.read()
 
 default_simulator = gws(str(config_path))
-# meta data for identifying the simulation
-GIT_DESCRIPTION = get_git_describe()
+# TODO: meta data for identifying the simulation (failed if not run in a git repo)
+# GIT_DESCRIPTION = get_git_describe()
 
 
 def run_sim(theta: torch.Tensor, simulator: gws = default_simulator) -> torch.Tensor:
@@ -80,7 +80,14 @@ def run_sim(theta: torch.Tensor, simulator: gws = default_simulator) -> torch.Te
     return masses, xs
 
 
-def sim_and_store(thetas: torch.Tensor, batch_id: int, seed_in_use: int, num_sims: int, num_workers: int, output: Path, simulator_config_file: Path):
+def sim_and_store(thetas: torch.Tensor,
+                  batch_id: int,
+                  seed_in_use: int,
+                  num_sims: int,
+                  num_workers: int,
+                  output: Path,
+                  simulator_config_file: Path,
+                  message: str = ""):
     """
     perform simulations and store output in hdf5 file. This function uses
     multiprocessing internally to facilitate parallel execution.
@@ -102,6 +109,8 @@ def sim_and_store(thetas: torch.Tensor, batch_id: int, seed_in_use: int, num_sim
         path of output file
     simulator_config_file : Path
         location of config file for simulator
+    message : str
+        optional message for reproducing the simulation
 
     Returns
     -------
@@ -154,7 +163,9 @@ def sim_and_store(thetas: torch.Tensor, batch_id: int, seed_in_use: int, num_sim
         out5_xs.attrs["config_file"] = config_content_str
         out5_xs.attrs["pycbc_version"] = pycbc.__version__
         out5_xs.attrs["seed"] = seed_in_use
-        out5_xs.attrs["git-describe"] = GIT_DESCRIPTION
+        if message is not None and len(message) > 0:
+            out5_xs.attrs["msg"] = message
+
         out5_thetas.attrs["seed"] = seed_in_use
         out5_masses.attrs["seed"] = seed_in_use
 
@@ -172,7 +183,8 @@ def sim_and_store(thetas: torch.Tensor, batch_id: int, seed_in_use: int, num_sim
 @click.option('-j', '--num_workers', default=1, type=int, help='number of worker processes to use in parallel')
 @click.option('-o', '--output', default="gws-<batchindex>.h5", type=click.Path(), help='output file location, please keep <batchindex> as placeholder')
 @click.option('-s', '--simulator_config_file', default=config_path, type=click.Path(), help='path to simulator config file')
-def main(batch_id, num_sims, num_workers, output, simulator_config_file):
+@click.option('-m', '--message', default="", type=str, help='optional metadata message for reproducibility')
+def main(batch_id, num_sims, num_workers, output, simulator_config_file, message):
     """ will generate {NUM_SIMS} samples from simulator and store the output in a hdf5 file """
 
     idx = int(batch_id)  # Read in the first argument
@@ -200,7 +212,7 @@ def main(batch_id, num_sims, num_workers, output, simulator_config_file):
     print(
         f"simulating batch {idx} of {num_sims} simulated samples on {num_workers} detected cores"
     )
-    value = sim_and_store(thetas, batch_id, batch_id, num_sims, num_workers, output, config_path)
+    value = sim_and_store(thetas, batch_id, batch_id, num_sims, num_workers, output, config_path, message)
     return value
 
 
